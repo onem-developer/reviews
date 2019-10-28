@@ -46,13 +46,24 @@ class HomeView(View):
     http_method_names = ['get']
 
     def get(self, request):
+        menu_items = []
+        # check if an item has just been rated
+        rating_added = cache.get('rating_added')
+        if rating_added:
+            menu_items.append(
+                MenuItem(description='Rating of {value} was added to {item}'.format(
+                    value=rating_added['rating_value'],
+                    item=rating_added['rated_item']))
+                )
+            cache.set('rating_added', None)
+
         items = Item.objects.all()  # local sqlite DB is already populated
-        menu_items = [
+        menu_items.extend([
             MenuItem(description=item.name,
                      method='GET',
                      path=reverse('item_detail', args=[item.id]))
             for item in items
-        ]
+        ])
 
         content = Menu(body=menu_items, header=u'REVIEWS HOME')
         return self.to_response(content)
@@ -64,12 +75,11 @@ class ItemDetailView(View):
     def get(self, request, id):
         item = get_object_or_404(Item, id=id)
         comments_count = Comment.objects.filter(item=item).count()
-        menu_items = []
-        body_pre = [
-            item.item_description,
-            u'Rating: {rating}'.format(rating=item.rating)
+
+        menu_items = [
+            MenuItem(description=item.item_description),
+            MenuItem(description=u'Rating: {rating}'.format(rating=item.rating))
         ]
-        menu_items.extend([MenuItem(description=u'\n'.join(body_pre))])
 
         menu_items.extend([
             MenuItem(description=u'Comments ({count})'.format(count=comments_count),
@@ -82,16 +92,12 @@ class ItemDetailView(View):
         if item.item_owner != self.get_user():
            menu_items.extend([
                MenuItem(description=u'Rate',
-                        method='POST',
-                        path=reverse('rating', args=[item.id]))
+                        method='GET',
+                        path=reverse('rating', args=[item.id, item.rating]))
            ])
 
         content = Menu(body=menu_items, header=item.name)
         return self.to_response(content)
-
-    def post(self, request, id):
-        # TODO: treat the rating here
-        pass
 
 
 class AddCommentView(View):
@@ -152,10 +158,6 @@ class CommentListView(View):
 
         return self.to_response(content)
 
-    def post(self, request, id):
-        # is this even needed ?!
-        pass
-
 
 class CommentDetailView(View):
     http_method_names = ['get', 'post']
@@ -175,7 +177,38 @@ class CommentDetailView(View):
 
 
 class RatingView(View):
-    http_method_names = ['post']
+    http_method_names = ['get', 'post']
 
-    def post(self, request, id):
-        pass
+    def get(self, request, id, new_rating=None):
+        form_items = [
+            FormItem(type=FormItemType.string,
+                     name='rating_value',
+                     description=u'\n'.join([
+                         'Send your rating from 1 to 5.',
+                         '1 is Poor, 5 is Excellent.'
+                     ]),
+                     header='add rating',
+                     footer='Reply "1".."5"')
+        ]
+        form = Form(body=form_items,
+                    method='POST',
+                    path=reverse('rating', args=[id, new_rating]),
+                    meta=FormMeta(confirmation_needed=False,
+                                  completion_status_in_header=False,
+                                  completion_status_show=False))
+        return self.to_response(form)
+
+    def post(self, request, id, new_rating):
+        item = get_object_or_404(Item, id=id)
+        rating = item.rating or 3
+        new_rating = (rating + int(self.request.POST['rating_value'])) / 2
+        item.rating = new_rating
+        item.save()
+
+        cache.set(
+            'rating_added',
+            {'rated_item': item.item_description,
+             'rating_value': int(self.request.POST['rating_value'])}
+        )
+
+        return HttpResponseRedirect(reverse('home'))

@@ -7,6 +7,6 @@ urlpatterns = [
     path('add_comment/<int:id>/', views.AddCommentView.as_view(), name='add_comment'),
     path('comment_list/<int:id>/', views.CommentListView.as_view(), name='comment_list'),
     path('comment_detail/<int:id>/', views.CommentDetailView.as_view(), name='comment_detail'),
-    path('rating/<int:id>/', views.RatingView.as_view(), name='rating'),
+    path('rating/<int:id>/<int:new_rating>/', views.RatingView.as_view(), name='rating'),
 ]
 
