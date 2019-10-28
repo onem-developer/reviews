@@ -18,7 +18,17 @@ Set the callback URL to the forwarding address obtained from ngrok's output;
 Go to https://testtool.dhq.onem/ and send the registered name with # in front.
 
 ### Important
----TODO---
+The local sqlite database is already populated with 3 items.
+So, when you start the service you should see the below menu and already be able to rate or comment:
+```
+--------------------
+#(app_name) REVIEWS HOME
+A item 1
+B item 2
+C item 3
+--Reply A-C
+--------------------
+```
 
 
 ### Deploy to Heroku
